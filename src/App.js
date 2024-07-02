@@ -1,6 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
-import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
@@ -8,8 +7,7 @@ import Form from 'react-bootstrap/Form';
 import Offcanvas from 'react-bootstrap/Offcanvas';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { IoMdAddCircle, IoMdEye, IoMdSettings, IoMdDownload } from 'react-icons/io';
-import logo from './logo.png'
-//import './reportembed.bundle.min.ac7238a47b29610c5b1b.css';
+import logo from './logo.png';
 
 function App() {
   const [height, setHeight] = useState('');
@@ -20,9 +18,11 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
   const [showExitPresentation, setShowExitPresentation] = useState(false);
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState(null);
+  const [scrollingDown, setScrollingDown] = useState(true);
+  const [scrollInterval, setScrollInterval] = useState(null);
 
   const containerRef = useRef(null);
+  const presentationRef = useRef(null);
 
   const handleCloseModal = () => setShowModal(false);
   const handleShowModal = () => setShowModal(true);
@@ -47,6 +47,7 @@ function App() {
     setShowExitPresentation(true);
     containerRef.current.requestFullscreen(); // Entra em tela cheia
     containerRef.current.style.padding = '0';
+    startAutoScroll();
   };
 
   const handleExitPresentationMode = () => {
@@ -54,6 +55,7 @@ function App() {
     setShowExitPresentation(false);
     document.exitFullscreen(); // Sai da tela cheia
     containerRef.current.style.padding = '20px';
+    stopAutoScroll();
   };
 
   const handleMouseMove = () => {
@@ -117,31 +119,57 @@ function App() {
     });
   };
 
+  const startAutoScroll = () => {
+    const interval = setInterval(() => {
+      if (presentationRef.current) {
+        const maxScrollTop = presentationRef.current.scrollHeight - presentationRef.current.clientHeight;
+        const currentScrollTop = presentationRef.current.scrollTop;
+
+        if (scrollingDown) {
+          if (currentScrollTop < maxScrollTop) {
+            presentationRef.current.scrollBy({ top: 100, behavior: 'smooth' });
+          } else {
+            setScrollingDown(false);
+          }
+        } else {
+          if (currentScrollTop > 0) {
+            presentationRef.current.scrollBy({ top: -100, behavior: 'smooth' });
+          } else {
+            setScrollingDown(true);
+          }
+        }
+      }
+    }, 1000); // Intervalo de 1 segundo para rolagem
+    setScrollInterval(interval);
+  };
+
+  const stopAutoScroll = () => {
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+      setScrollInterval(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => stopAutoScroll();
+  }, []);
 
   return (
     <>
-      <Navbar style={{ height: '35px',backgroundColor: '#ff6200'}}>
+      <Navbar style={{ height: '35px', backgroundColor: '#ff6200' }}>
         <Container fluid className="d-flex justify-content-between align-items-center">
-          <img src={logo} height={'30px'}></img>
+          <img src={logo} height={'30px'} alt="Logo" />
           <div className="d-flex align-items-center">
-            
-              <IoMdEye style={{ fontSize: '1.5rem',color:'white',marginLeft:'10px' }} onClick={handleEnterPresentationMode}/>
-          
-      
-              <IoMdAddCircle style={{ fontSize: '1.5rem',color:'white',marginLeft:'10px' }} onClick={handleShowModal}/>
-         
-      
-              <IoMdSettings style={{ fontSize: '1.5rem',color:'white',marginLeft:'10px'  }} onClick={() => setShowOffCanvas(true)}/>
-      
-        
-              <IoMdDownload style={{ fontSize: '1.5rem',color:'white',marginLeft:'10px'  }} onClick={handleDownloadConfig}/>
-  
+            <IoMdEye style={{ fontSize: '1.5rem', color: 'white', marginLeft: '10px' }} onClick={handleEnterPresentationMode} />
+            <IoMdAddCircle style={{ fontSize: '1.5rem', color: 'white', marginLeft: '10px' }} onClick={handleShowModal} />
+            <IoMdSettings style={{ fontSize: '1.5rem', color: 'white', marginLeft: '10px' }} onClick={() => setShowOffCanvas(true)} />
+            <IoMdDownload style={{ fontSize: '1.5rem', color: 'white', marginLeft: '10px' }} onClick={handleDownloadConfig} />
             <Button
               className="me-2"
               style={{
                 backgroundColor: 'transparent',
                 border: 'none',
-                padding: 0,marginLeft:'10px'
+                padding: 0, marginLeft: '10px'
               }}
             >
               <input
@@ -208,6 +236,7 @@ function App() {
                           updatedIframes[index].height = e.target.value;
                           setIframes(updatedIframes);
                         }}
+                        style={{ maxWidth: '100%'                      }}
                         style={{ maxWidth: '100%' }}
                       />
                     </div>
@@ -221,7 +250,7 @@ function App() {
           </Offcanvas.Body>
         </Offcanvas>
       )}
-
+  
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
           <Modal.Title>Adicionar Dash</Modal.Title>
@@ -263,7 +292,7 @@ function App() {
           </Form>
         </Modal.Body>
       </Modal>
-
+  
       <div
         ref={containerRef}
         style={{
@@ -290,9 +319,22 @@ function App() {
             ></iframe>
           </div>
         ))}
-
+  
         {presentationMode && (
-          <div className="frame" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', zIndex: 1, overflow: 'auto', background: '#414141', }}>
+          <div
+            ref={presentationRef}
+            className="frame"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100vh',
+              zIndex: 1,
+              overflow: 'auto',
+              background: '#414141',
+            }}
+          >
             {iframes.map((iframe, index) => (
               <div key={index} style={{ textAlign: 'center' }}>
                 <iframe
@@ -300,7 +342,6 @@ function App() {
                   width="100%"
                   height={iframe.height}
                   style={{ border: 'none' }}
-                 
                   scrolling="no" // Aqui está o atributo para remover o scroll
                 ></iframe>
               </div>
@@ -314,11 +355,19 @@ function App() {
                 Sair da Apresentação
               </Button>
             )}
+            <Button
+              variant="light"
+              onClick={handleExitPresentationMode}
+              style={{ position: 'fixed', bottom: '20px', right: '20px' }}
+            >
+              Parar Rolagem Automática
+            </Button>
           </div>
         )}
       </div>
     </>
   );
-}
-
-export default App;
+  }
+  
+  export default App;
+  
